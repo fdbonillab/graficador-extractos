@@ -6,6 +6,13 @@ import matplotlib.pyplot as plt
 from itertools import cycle
 from dateutil import parser 
 import datetime
+from statistics import mean 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+import datetime as dt
+import numpy as np
+import pandas as pd
+
 #wb = load_workbook('datos.xlsx', data_only=True)
 
 # fecha descripcion sucursal valor saldo
@@ -144,7 +151,35 @@ def greet():
 
 def has_numbers(inputString):
     return bool(re.search(r'\d', inputString))
-
+def pintarPrediccion():
+    #xColumn= X_train[:,1] 
+    xColumn = np.take(X_train, 0, axis=1)
+    # Prediction on training set
+    print(' len x '+str(len(X_train))+' len y '+str(len(y_train))+" len xtodos "+str(len(xTodos)))
+    print(X_train)
+    print(y_train)
+    plt.scatter(xColumn, y_train, color = 'lightcoral')
+    plt.plot(xColumn, y_pred_train, color = 'firebrick')
+    plt.title('Salary vs Experience (Training Set)')
+    plt.xlabel('Years of Experience')
+    plt.ylabel('Salary')
+    plt.legend(['X_train/Pred(y_test)', 'X_train/y_train'], title = 'Sal/Exp', loc='best', facecolor='white')
+    plt.box(False)
+    plt.show()
+def armarDataFrame(matrixSaldos):
+    columns = ["fecha", "valor"]
+    rows = ["D", "E", "F"]
+    data = matrixSaldos
+    df = pd.DataFrame(data=data, index=range(0,len(matrixSaldos)), columns=columns)
+    print('dataFrame ')
+    print(df)
+    return df
+def promedioMensual(df):
+    df['month'] = pd.to_datetime(df['fecha']).dt.month
+    df['year'] = pd.to_datetime(df['fecha']).dt.year
+    promedioMensual = df.groupby(['year','month'],as_index=False).mean()
+    print('promedio mensual')
+    print(promedioMensual)
 ##greet()
 files = [f for f in os.listdir() if os.path.isfile(f)]
 print(files)
@@ -171,13 +206,13 @@ for file in files:
         print( ' fechas extraidas ')
         for dato in reporteArchivo:
             algo = 1
-            dato.mostrarFechaValor()
+            #dato.mostrarFechaValor()
         print (' lontitud arreglo archivo '+str(len(reporteArchivo)))
         reporteTotal.append(reporteArchivo)
         print (' lontitud arreglo reporte total '+str(len(reporteTotal)))
         contador= contador +1
         #break para solo procesar un archivo
-        #break
+        break
 
 for rep in reporteTotal:
     for subRep in rep:
@@ -188,13 +223,56 @@ for rep in reporteTotal:
 reporteGeneral.sort(key=lambda x: x.fecha, reverse=False)
 menoresA10mil = 0
 mayoresA10mil = 0
+arrMayores10mil = []
+# Splitting dataset into test/train
+
+paraPromedio = []
+xTodos = []
+yTodos = []
 for rep in reporteGeneral:
-        ejeX.append(rep.fecha)
+        #ejeX.append(rep.fecha)
+        xTodos.append(rep.fecha)
         valorNum = int(rep.valor)
-        if valorNum < 10000:
+        if abs(valorNum) < 10000:
             menoresA10mil = menoresA10mil+1
+        else:
             mayoresA10mil = mayoresA10mil+1
-        ejeY.append(valorNum)
+            arrMayores10mil.append(rep)
+        #ejeY.append(valorNum)
+        yTodos.append(valorNum)
+        paraPromedio.append(valorNum)
+print(' promedio '+str(mean(paraPromedio)))
+
+yDependiente = []
+matrixParaDataFrame = []
+for i in range (0, len(xTodos)):
+    #print(xTodos[i])
+    dateFecha =  datetime.datetime.strptime(xTodos[i], '%Y-%m-%d')
+    #print('datefecha')
+    #print(dateFecha)
+    #print(' timestamp ')
+    #print(dateFecha.timestamp())
+    xTodos[i] = int(dateFecha.timestamp())
+    union =[ xTodos[i], yTodos[i]]
+    yDependiente.append(union)
+    matrixParaDataFrame.append([dateFecha,yTodos[i]])
+df = armarDataFrame(matrixParaDataFrame)
+promedioMensual(df)
+#xTodos= xTodos.map(dt.datetime.toordinal)
+# Splitting dataset into test/train
+X_train, X_test, y_train, y_test = train_test_split(yDependiente, yTodos, test_size = 0.2, random_state = 0)
+# Regressor model
+regressor = LinearRegression()
+regressor.fit(X_train, y_train)
+# Prediction result
+y_pred_test = regressor.predict(X_test)     # predicted value of y_test
+y_pred_train = regressor.predict(X_train)   # predicted value of y_train
+#aki se pinta la prediccion
+#pintarPrediccion()
+
+for rep in arrMayores10mil:
+    ejeX.append(rep.fecha)
+    ejeY.append(int(rep.valor))
 print (' conteo reporte general '+str(len(reporteGeneral)))
 print(' menores a 10k '+str(menoresA10mil))
 print(' mayores a 10k '+str(mayoresA10mil))
@@ -210,7 +288,7 @@ subY = ejeY
 #print(subY)
 print(' min suby '+str(min(subY)))
 print(' max suby '+str(max(subY)))
-for rep in reporteGeneral:
+for rep in arrMayores10mil:
     estado = rep
     #plt.plot(ejeX, ejeY, label="Data " + str(estado.fecha),       color=next(colors))
     #plt.plot(ejeX, ejeY, 'rs')
